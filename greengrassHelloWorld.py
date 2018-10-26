@@ -101,7 +101,8 @@ def greengrass_infinite_infer_run():
         client.publish(topic=iot_topic, payload='Loading object detection model')
         model = awscam.Model(model_path, {'GPU': 1})
         client.publish(topic=iot_topic, payload='Object detection model loaded')
-        # Set the threshold for detection        detection_threshold = 0.25
+        # Set the threshold for detection
+        detection_threshold = 0.45
         # The height and width of the training set images
         input_height = 300
         input_width = 300
@@ -123,25 +124,6 @@ def greengrass_infinite_infer_run():
             # image.
             yscale = float(frame.shape[0]/input_height)
             xscale = float(frame.shape[1]/input_width)
-            
-            
-            cache = Cache('/home/aws_cam/diskcachedir')
-            heartrate = cache[b'heartrate']
-            speed = cache[b'speed']
-            cadence = cache[b'cadence'] 
-           
-
-            topleftcoord = (25, 105)
-            bottomleftcoord = (25, frame.shape[0]-100)
-            toprightcoord = (frame.shape[1]-1000, 105)
-            bottomrightcoord = (frame.shape[1]-1000, frame.shape[0]-100)
-
-            cv2.putText(frame, "{}: {}".format('Heartrate', heartrate), bottomleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-            cv2.putText(frame, "{}: {}".format('Speed', heartrate), topleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-            cv2.putText(frame, "{}: {}".format('Cadence', heartrate), toprightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-            cv2.putText(frame, "{}: {}".format('TPS', heartrate), bottomrightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-            #cv2.putText(frame, "{}: {}".format(frame.shape[1], frame.shape[0]), (1250, 700), cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-
 
            # Dictionary to be filled with labels and probabilities for MQTT
             cloud_output = {}
@@ -170,6 +152,21 @@ def greengrass_infinite_infer_run():
                                 (xmin, ymin-text_offset),
                                 cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
 
+                    cache = Cache('/home/aws_cam/diskcachedir')
+                    heartrate = cache[b'heartrate'] or '--'
+                    speed = cache[b'speed'] or '--'
+                    cadence = cache[b'cadence'] or '--'
+
+                    topleftcoord = (25, 105)
+                    bottomleftcoord = (25, frame.shape[0]-100)
+                    toprightcoord = (frame.shape[1]-1000, 105)
+                    bottomrightcoord = (frame.shape[1]-1000, frame.shape[0]-100)
+
+                    cv2.putText(frame, "{}: {}".format('Heartrate', heartrate), bottomleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
+                    cv2.putText(frame, "{}: {}".format('Speed', speed), topleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
+                    cv2.putText(frame, "{}: {}".format('Cadence', cadence), toprightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
+                    cv2.putText(frame, "{}: {}".format('TPS', heartrate), bottomrightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
+                    #cv2.putText(frame, "{}: {}".format(frame.shape[1], frame.shape[0]), (1250, 700), cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
 
                     #cv2.putText(frame, "{}: {}".format('Heartrate', '100'), (xmin+15, ymax-15), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255,165,20),6)	
                     # Store label and probability to send to cloud
