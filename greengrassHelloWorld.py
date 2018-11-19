@@ -12,9 +12,9 @@ import numpy as np
 import awscam
 import cv2
 import greengrasssdk
-import sys
+import mo
+import ast
 from diskcache import Cache
-import time
 
 class LocalDisplay(Thread):
     """ Class for facilitating the local display of inference results
@@ -81,38 +81,44 @@ def greengrass_infinite_infer_run():
         # This object detection model is implemented as single shot detector (ssd), since
         # the number of labels is small we create a dictionary that will help us convert
         # the machine labels to human readable labels.
+        model_name = "deploy_model_algo_1"
         model_type = 'ssd'
-        output_map = {1: 'aeroplane', 2: 'bicycle', 3: 'bird', 4: 'boat', 5: 'bottle', 6: 'bus',
-                      7 : 'car', 8 : 'cat', 9 : 'chair', 10 : 'cow', 11 : 'dinning table',
-                      12 : 'dog', 13 : 'horse', 14 : 'motorbike', 15 : 'person',
-                      16 : 'pottedplant', 17 : 'sheep', 18 : 'sofa', 19 : 'train',
-                      20 : 'tvmonitor'}
+        input_width = 300
+        input_height = 300
+        max_threshold = 0.1
+        # output_map = {0:'construction', 1:'crowd',2:'pothole',3:'person-bike',4:'person-pet', 5:'baby-strolls',6:'traffic-lights',7:'car', 8:'pedestrians'}
+        output_map = {1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorbike', 5: 'aeroplane', 6: 'bus', 7: 'train', 8: 'truck', 9: 'boat', 10: 'traffic light', 11: 'fire hydrant', 12: 'stop sign', 13: 'parking meter', 14: 'bench', 15: 'bird', 16: 'cat', 17: 'dog', 18: 'horse', 19: 'sheep', 20: 'cow', 21: 'elephant', 22: 'bear', 23: 'zebra', 24: 'giraffe', 25: 'backpack', 26: 'umbrella', 27: 'handbag', 28: 'tie', 29: 'suitcase', 30: 'frisbee', 31: 'skis', 32: 'snowboard', 33: 'sports ball', 34: 'kite', 35: 'baseball bat', 36: 'baseball glove', 37: 'skateboard', 38: 'surfboard', 39: 'tennis racket', 40: 'bottle', 41: 'wine glass', 42: 'cup', 43: 'fork', 44: 'knife', 45: 'spoon', 46: 'bowl', 47: 'banana', 48: 'apple', 49: 'sandwich', 50: 'orange', 51: 'broccoli', 52: 'carrot', 53: 'hot dog', 54: 'pizza', 55: 'donut', 56: 'cake', 57: 'chair', 58: 'sofa', 59: 'pottedplant', 60: 'bed', 61: 'diningtable', 62: 'toilet', 63: 'tvmonitor', 64: 'laptop', 65: 'mouse', 66: 'remote', 67: 'keyboard', 68: 'cell phone', 69: 'microwave', 70: 'oven', 71: 'toaster', 72: 'sink', 73: 'refrigerator', 74: 'book', 75: 'clock', 76: 'vase', 77: 'scissors', 78: 'teddy bear', 79: 'hair drier', 80: 'toothbrush'}
+        #output_map = {0:'construction', 1:'crowd',2:'pothole',3:'person-bike',4:'person-pet', 5:'baby-strolls',6:'car',7:'pedestrians', 8:'person_bike', 9:'home',4:'person_pet',5:'baby_strolls'}
+
         # Create an IoT client for sending to messages to the cloud.
         client = greengrasssdk.client('iot-data')
-        iot_topic = '$aws/things/{}/infer'.format(os.environ['AWS_IOT_THING_NAME'])
+        #iot_topic = '$aws/things/{}/infer'.format(os.environ['AWS_IOT_THING_NAME'])
+        iot_topic = 'smartcycle/object-detection'
         # Create a local display instance that will dump the image bytes to a FIFO
         # file that the image can be rendered locally.
         local_display = LocalDisplay('480p')
         local_display.start()
         # The sample projects come with optimized artifacts, hence only the artifact
         # path is required.
-        model_path = '/opt/awscam/artifacts/mxnet_deploy_ssd_resnet50_300_FP16_FUSED.xml'
+        model_path = '/opt/awscam/artifacts/mxnet_deploy_model_algo_1_FP32_FUSED.xml'
+        #error, model_path = mo.optimize(model_name, input_width, input_height , aux_inputs={'--epoch':0})
         # Load the model onto the GPU.
-        client.publish(topic=iot_topic, payload='Loading object detection model')
+        client.publish(topic=iot_topic, payload='Loading object detection model: {0}'.format(model_path))
         model = awscam.Model(model_path, {'GPU': 1})
         client.publish(topic=iot_topic, payload='Object detection model loaded')
         # Set the threshold for detection
-        detection_threshold = 0.45
+        #detection_threshold = 0.12
+        detection_threshold = 0.30
         # The height and width of the training set images
-        input_height = 300
-        input_width = 300
+        # input_height = 300
+        # input_width = 300
         # Do inference until the lambda is killed.
         while True:
             # Get a frame from the video stream
             ret, frame = awscam.getLastFrame()
             if not ret:
                 raise Exception('Failed to get frame from the stream')
-            # Resize frame to the same size as the training set.:function
+            # Resize frame to the same size as the training set.
             frame_resize = cv2.resize(frame, (input_height, input_width))
             # Run the images through the inference engine and parse the results using
             # the parser API, note it is possible to get the output of doInference
@@ -120,16 +126,24 @@ def greengrass_infinite_infer_run():
             # a simple API is provided.
             parsed_inference_results = model.parseResult(model_type,
                                                          model.doInference(frame_resize))
+            #client.publish(topic=iot_topic, payload = str(parsed_inference_results))
             # Compute the scale in order to draw bounding boxes on the full resolution
             # image.
             yscale = float(frame.shape[0]/input_height)
             xscale = float(frame.shape[1]/input_width)
-
-           # Dictionary to be filled with labels and probabilities for MQTT
+            # Dictionary to be filled with labels and probabilities for MQTT
             cloud_output = {}
+            topk = 30
+            #client.publish(topic=iot_topic, payload = str(parsed_inference_results[model_type][0:topk]))
+            req_list =  [2,3,4,6,8]
             # Get the detected objects and probabilities
-            for obj in parsed_inference_results[model_type]:
+            for obj in parsed_inference_results[model_type]:#[0:topk]:
+                if obj['label'] >= 18 or obj['label'] not in req_list: #or output_map[obj['label']] != 'person' or  output_map[obj['label']] != 'bicycle' or output_map[obj['label']] != 'tst' or output_map[obj['label']] != 'motorbike' or output_map[obj['label']] != 'traffic light' or output_map[obj['label']] != 'stop sign' or output_map[obj['label']] != 'dog':
+                    continue
+                if obj['label'] == 3 and obj['prob'] *100 < 30: continue
                 if obj['prob'] > detection_threshold:
+                    #client.publish(topic=iot_topic, payload = str(obj['prob']))
+                    #client.publish(topic=iot_topic, payload = str(cloud_output))
                     # Add bounding boxes to full resolution frame
                     xmin = int(xscale * obj['xmin']) \
                            + int((obj['xmin'] - input_width/2) + input_width/2)
@@ -148,51 +162,60 @@ def greengrass_infinite_infer_run():
                     # Method signature: image, text, origin, font face, font scale, color,
                     # and tickness
                     cv2.putText(frame, "{}: {:.2f}%".format(output_map[obj['label']],
-                                                               obj['prob'] * 100),
+                                                            obj['prob'] * 100),
                                 (xmin, ymin-text_offset),
                                 cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
-
-                    cache = Cache('/home/aws_cam/diskcachedir')
-                    heartrate = cache[b'heartrate'] or '--'
-                    speed = cache[b'speed'] or '--'
-                    cadence = cache[b'cadence'] or '--'
-
-                    topleftcoord = (25, 105)
-                    bottomleftcoord = (25, frame.shape[0]-100)
-                    toprightcoord = (frame.shape[1]-1000, 105)
-                    bottomrightcoord = (frame.shape[1]-1000, frame.shape[0]-100)
-
-                    cv2.putText(frame, "{}: {}".format('Heartrate', heartrate), bottomleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-                    cv2.putText(frame, "{}: {}".format('Speed', speed), topleftcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-                    cv2.putText(frame, "{}: {}".format('Cadence', cadence), toprightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-                    cv2.putText(frame, "{}: {}".format('TPS', heartrate), bottomrightcoord, cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-                    #cv2.putText(frame, "{}: {}".format(frame.shape[1], frame.shape[0]), (1250, 700), cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
-
-                    #cv2.putText(frame, "{}: {}".format('Heartrate', '100'), (xmin+15, ymax-15), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255,165,20),6)	
                     # Store label and probability to send to cloud
                     cloud_output[output_map[obj['label']]] = obj['prob']
-                    
-	            #heartrate = 0
-		    #speed = 0
-                    #cadence = 0	
-			
-		    #with Cache('/home/aws_cam/diskcachedir') as lc1:
-		    #	heartrate =lc1[b'heartrate']
-                    #    speed = lc1[b'speed']
-                    #    cadence = lc1[b'cadence']
 
-	    # Set the next frame in the local display stream.
+            #START SENSOR METRICS DISPLAY
+            #Transparent rectangle overlays
+            overlay = frame.copy()
+            info_rect_color = (13,13,13)
+
+            #top left rectangle
+            cv2.rectangle(overlay, (0,0), (800,200), info_rect_color, -1)
+
+            #bottom left rectangle
+            cv2.rectangle(overlay, (0,frame.shape[0]-200), (900,frame.shape[0]), info_rect_color, -1)
+
+            #top right rectangle
+            cv2.rectangle(overlay, (frame.shape[1]-800,0), (frame.shape[1],200), info_rect_color, -1)
+
+            #bottom right rectangle
+            cv2.rectangle(overlay, (frame.shape[1]-900,frame.shape[0]-200), (frame.shape[1],frame.shape[0]), info_rect_color, -1)
+
+            alpha = 0.60
+            beta = 0.40
+
+            cv2.addWeighted(overlay, alpha, frame, beta, 0, frame)
+
+            cache = Cache('/home/aws_cam/diskcachedir')
+            heartrate = cache[b'heartrate'] or '--'
+            speed = cache[b'speed'] or '--'
+            cadence = cache[b'cadence'] or '--'
+            temperature = cache[b'temperature'] or '--'
+
+            normal_font_color = (0,255,0)
+            normal_font = cv2.FONT_HERSHEY_COMPLEX
+            normal_font_scale = 3
+
+            topleftcoord = (50, 125)
+            bottomleftcoord = (50, frame.shape[0]-95)
+            toprightcoord = (frame.shape[1]-750, 125)
+            bottomrightcoord = (frame.shape[1]-750, frame.shape[0]-95)
+
+            cv2.putText(frame, "{}: {}".format('HEARTRATE', heartrate), bottomleftcoord, normal_font, normal_font_scale, normal_font_color,6)
+            cv2.putText(frame, "{}: {}".format('SPEED', speed), topleftcoord, normal_font, normal_font_scale, normal_font_color,6)
+            cv2.putText(frame, "{}: {}".format('CADENCE', cadence), toprightcoord, normal_font, normal_font_scale, normal_font_color,6)
+            cv2.putText(frame, "{}: {}F".format('TEMP', int(temperature)), bottomrightcoord, normal_font, normal_font_scale, normal_font_color,6)
+            #cv2.putText(frame, "{}: {}".format(frame.shape[1], frame.shape[0]), (1250, 700), cv2.FONT_HERSHEY_SIMPLEX, 4.5, (66,144,161),6)
+
+            # Set the next frame in the local display stream.
+            # getall = ast.literal_eval(cloud_output)
             local_display.set_frame_data(frame)
             # Send results to the cloud
-	    #pythonpath = ';'.join(sys.executable)	
-            #create a refernece to our diskcache location locally
-            with Cache('/home/aws_cam/diskcachedir') as localcache:
-                antdevicedata = 'Heartrate: ' + str(localcache[b'heartrate'])
-
             client.publish(topic=iot_topic, payload=json.dumps(cloud_output))
-            client.publish(topic=iot_topic, payload=antdevicedata)
-            #time.sleep(1)
-            cache.close()  
     except Exception as ex:
         client.publish(topic=iot_topic, payload='Error in object detection lambda: {}'.format(ex))
 
