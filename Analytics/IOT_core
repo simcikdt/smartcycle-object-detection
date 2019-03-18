@@ -1,0 +1,2 @@
+SELECT metrics.heartrate AS heartrate, metrics.temperature AS temperature, metrics.key1 AS key1, metrics.key2 AS key2, metrics.speed AS speed, metrics.cadence AS cadence FROM '$aws/things/deeplens_mrfWZnY7SdOeuJAy-nAD4w/infer'
+Save the metrics data to dynamodb

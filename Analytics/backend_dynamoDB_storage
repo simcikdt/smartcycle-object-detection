@@ -1,0 +1,5 @@
+key1: string
+key2: string
+key1-> date
+key2 -> time
+other columns include cadence, heartrate, speed, temperature
