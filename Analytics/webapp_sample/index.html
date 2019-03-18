@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="multiline.css">
+    <script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
+    <!--<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>-->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<div class="chart-wrapper" id="chart-line1"></div>
+
+<script type="text/javascript">
+    // d3.json('https://vgx51f9ejj.execute-api.us-east-1.amazonaws.com/stage', function(error, data) {
+    //     data.forEach(function (d) {
+    //         console.log(d)
+    //         var myDate =new Date(d.key1 + "T" +d.key2);
+    //         d.timestamp = d.key2
+    //         d.variableA = +d.cadence;
+    //         d.variableB = +d.heartrate;
+    //         d.variableC = +d.speed;
+    //         d.variableD = +d.temperature;
+    //     });
+    //
+    //     var chart = makeLineChart(data, 'timestamp', {
+    //         'Cadence': {column: 'variableA'},
+    //         'heartrate': {column: 'variableB'},
+    //         'speed': {column: 'variableC'},
+    //         'temperature': {column: 'variableD'}
+    //     }, {xAxis: 'Timestamp', yAxis: 'Values'});
+    //     chart.bind("#chart-line1");
+    //     chart.render();
+    //
+    // });
+
+</script>
+<script src="multiline.js" charset="utf-8"></script>
+<div id="myDiv1"><!-- Plotly chart will be drawn inside this DIV --></div>
+<!--<div id="myDiv2">-->
+    <!--<div id="myDiv3">-->
+        <!--<div id="myDiv4">-->
+<script>
+    Plotly.d3.json('https://vgx51f9ejj.execute-api.us-east-1.amazonaws.com/stage', function(error, data) {
+        data.forEach(function (d) {
+            console.log(d)
+            var myDate = new Date(d.key1 + "T" + d.key2);
+            d.timestamp = myDate
+            d.variableA = +d.cadence;
+            d.variableB = +d.heartrate;
+            d.variableC = +d.speed;
+            d.variableD = +d.temperature;
+        });
+        console.log("check",data)
+        let xl = []
+        let yl = []
+        let yl2 = []
+        let yl3 = []
+        let yl4 = []
+
+        for (i = 0; i < data.length; i++)
+        {
+            xl.push(data[i]['timestamp'])
+            yl.push(data[i]['variableB'])
+
+            yl2.push(data[i]['variableA'])
+            yl3.push(data[i]['variableC'])
+            yl4.push(data[i]['variableD'])
+        }
+        trace = {
+            x: xl,
+            y: yl,
+            type: 'scatter',
+            name: 'heartrate',
+            line: {
+                color: 'rgb(55, 100, 191)',
+                width: 3
+            }
+
+        }
+
+        trace1 = {
+            x: xl,
+            y: yl2,
+            type: 'scatter',
+            name: 'cadence',
+            line: {
+                color: 'rgb(219, 64, 82)',
+                width: 3
+            }
+        }
+
+        trace2 = {
+            x: xl,
+            y: yl3,
+            type: 'scatter',
+            name: 'speed',
+            line: {
+                color: 'rgb(55, 128, 191)',
+                width: 3
+            }
+        }
+
+        trace3 = {
+            x: xl,
+            y: yl4,
+            type: 'scatter',
+            name: 'temperature',
+            line: {
+                color: 'rgb(60, 64, 82)',
+                width: 3
+            }
+        }
+            // var data = [
+        //     {
+        //         x: data['timestamp'],
+        //         y: data['variableB'],
+        //         type: 'scatter'
+        //     }
+        // ];
+        var tracef = [ trace , trace1, trace2, trace3 ];
+        console.log("hi", tracef)
+        Plotly.plot('myDiv1', tracef);
+        // Plotly.plot('myDiv2', [trace1]);
+        // Plotly.plot('myDiv3', [trace2]);
+        // Plotly.plot('myDiv4', [trace3]);
+    });
+</script>
+</body>
+</html>
